@@ -171,7 +171,6 @@ def create_dataframe(observer):
         stars.ra, stars.dec, observer
     )
     stars = stars.query('altitude > {}'.format(np.deg2rad(min_altitude - 5)))
-    stars = stars.query('vmag < 9')
 
     return stars
 
@@ -209,6 +208,35 @@ def dark_spot_gridsearch(observer,
     return az, alt, ra, dec
 
 
+def plot_dark_spot(stars, az, alt, min_altitude):
+    import matplotlib.pyplot as plt
+    from cartopy import crs
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection=crs.NorthPolarStereo())
+    ax.background_patch.set_facecolor('black')
+
+    ax.set_extent([-180, 180, min_altitude - 5, 90], crs.PlateCarree())
+
+    ax.plot(np.rad2deg(az), np.rad2deg(alt), 'ro', transform=crs.PlateCarree())
+
+    plot = ax.scatter(
+        np.rad2deg(stars.azimuth),
+        np.rad2deg(stars.altitude),
+        c=stars.vmag,
+        vmax=15,
+        s=0.5*(-stars.vmag + stars.vmag.max())**2,
+        transform=crs.PlateCarree(),
+        cmap='gray_r',
+    )
+
+    ax.gridlines(color='blue', ylocs=[min_altitude,])
+    fig.colorbar(plot, ax=ax, label='visual magnitude')
+
+    fig.tight_layout()
+    plt.show()
+
+
 def main():
 
     if args['<date>']:
@@ -236,6 +264,10 @@ def main():
     print(u'DEC: {:1.3f}°'.format(np.rad2deg(dec)))
     print(u'Az: {:1.3f}°'.format(np.rad2deg(az)))
     print(u'Alt: {:1.3f}°'.format(np.rad2deg(alt)))
+
+    if args['--plot']:
+        plot_dark_spot(stars, az, alt, min_altitude)
+
 
 
 if __name__ == '__main__':
