@@ -33,8 +33,8 @@ term = Terminal()
 def fact_setup(date):
     ''' creates an ephem.Observer for FACT at given date '''
     fact = ephem.Observer()
-    fact.lon = '-17:53:05'
-    fact.lat = '28:45:15'
+    fact.lon = '-17:53:28'
+    fact.lat = '28:45:42'
     fact.elevation = 2200
     fact.date = date
     fact.epoch = ephem.J2000
