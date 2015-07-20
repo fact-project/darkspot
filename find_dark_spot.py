@@ -207,7 +207,7 @@ def dark_spot_gridsearch(observer,
     return az, alt, ra, dec
 
 
-def plot_dark_spot(stars, az, alt, ra, dec, min_altitude, observer):
+def plot_dark_spot(stars, az, alt, min_altitude):
     import matplotlib.pyplot as plt
     from cartopy import crs
 
@@ -239,12 +239,10 @@ def plot_dark_spot(stars, az, alt, ra, dec, min_altitude, observer):
     )
 
     # draw fov, ugly
-    delta = np.deg2rad(10.0)
-    pra, pdec = np.meshgrid(np.linspace(ra-delta, ra+delta, 200),
-                            np.linspace(dec-delta, dec+delta, 200)
+    paz, palt = np.meshgrid(np.linspace(0, 2*pi, 200),
+                            np.linspace(pi/2, np.deg2rad(min_altitude - 5), 100)
                             )
-    dist = angular_distance(pra, pdec, ra, dec)
-    paz, palt = equatorial2horizontal(pra, pdec, observer)
+    dist = angular_distance(paz, palt, az, alt)
     ax.contour(np.rad2deg(paz),
                np.rad2deg(palt),
                dist,
@@ -253,7 +251,11 @@ def plot_dark_spot(stars, az, alt, ra, dec, min_altitude, observer):
                transform=crs.PlateCarree(),
                )
 
-    ax.gridlines(color='blue', ylocs=[min_altitude, ], lw=1, linestyle='-')
+    paz = np.linspace(0, 360, 100)
+    plt.plot(
+        paz, np.ones_like(paz) * min_altitude,
+        'b-', transform=crs.PlateCarree(),
+    )
     fig.colorbar(plot, ax=ax, label='visual magnitude')
 
     fig.tight_layout()
@@ -289,7 +291,7 @@ def main():
     print(u'Brightest star in FOV: {:1.2f} mag'.format(stars_fov.vmag.min()))
 
     if args['--plot']:
-        plot_dark_spot(stars, az, alt, ra, dec, min_altitude, fact)
+        plot_dark_spot(stars, az, alt, min_altitude)
 
 
 if __name__ == '__main__':
