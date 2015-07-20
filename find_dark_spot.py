@@ -17,8 +17,8 @@ from __future__ import division, print_function
 from docopt import docopt
 
 args = docopt(__doc__)
-min_altitude = 90 - int(args['--max-zenith'])
-max_zenith = int(args['--max-zenith'])
+min_altitude = 90 - float(args['--max-zenith'])
+max_zenith = float(args['--max-zenith'])
 
 import pandas as pd
 import numpy as np
@@ -166,7 +166,6 @@ def create_dataframe(observer):
         }
         stars = stars.append(data, ignore_index=True)
 
-
     stars['azimuth'], stars['altitude'] = equatorial2horizontal(
         stars.ra, stars.dec, observer
     )
@@ -208,7 +207,7 @@ def dark_spot_gridsearch(observer,
     return az, alt, ra, dec
 
 
-def plot_dark_spot(stars, az, alt, min_altitude):
+def plot_dark_spot(stars, az, alt, ra, dec, min_altitude, observer):
     import matplotlib.pyplot as plt
     from cartopy import crs
 
@@ -217,7 +216,6 @@ def plot_dark_spot(stars, az, alt, min_altitude):
     ax.background_patch.set_facecolor('black')
 
     ax.set_extent([-180, 180, min_altitude - 5, 90], crs.PlateCarree())
-
     ax.plot(np.rad2deg(az), np.rad2deg(alt), 'ro', transform=crs.PlateCarree())
 
     plot = ax.scatter(
@@ -230,7 +228,32 @@ def plot_dark_spot(stars, az, alt, min_altitude):
         cmap='gray_r',
     )
 
-    ax.gridlines(color='blue', ylocs=[min_altitude,])
+    ax.text(
+        0,
+        min_altitude - 0.2,
+        u'{:2.1f}˚ zenith distance'.format(max_zenith),
+        va='top',
+        ha='center',
+        color='blue',
+        transform=crs.PlateCarree(),
+    )
+
+    # draw fov, ugly
+    delta = np.deg2rad(10.0)
+    pra, pdec = np.meshgrid(np.linspace(ra-delta, ra+delta, 200),
+                            np.linspace(dec-delta, dec+delta, 200)
+                            )
+    dist = angular_distance(pra, pdec, ra, dec)
+    paz, palt = equatorial2horizontal(pra, pdec, observer)
+    ax.contour(np.rad2deg(paz),
+               np.rad2deg(palt),
+               dist,
+               [np.deg2rad(2.25), ],
+               colors='red',
+               transform=crs.PlateCarree(),
+               )
+
+    ax.gridlines(color='blue', ylocs=[min_altitude, ], lw=1, linestyle='-')
     fig.colorbar(plot, ax=ax, label='visual magnitude')
 
     fig.tight_layout()
@@ -238,7 +261,6 @@ def plot_dark_spot(stars, az, alt, min_altitude):
 
 
 def main():
-
     if args['<date>']:
         date = args['<date>']
         time = args['<timeutc>']
@@ -256,18 +278,18 @@ def main():
 
     fact = fact_setup(date)
     stars = create_dataframe(fact)
-    az, alt, ra, dec = dark_spot_gridsearch(fact, stars, min_altitude)
-
+    az, alt, ra, dec = dark_spot_gridsearch(fact, stars, min_altitude, 0.25, 2)
+    stars_fov = get_stars_in_fov(az, alt, stars, fact)
 
     print(u'best ratescan position:')
     print(u'RA: {:1.3f} h'.format(np.rad2deg(ra) * 24/360))
     print(u'DEC: {:1.3f}°'.format(np.rad2deg(dec)))
     print(u'Az: {:1.3f}°'.format(np.rad2deg(az)))
     print(u'Alt: {:1.3f}°'.format(np.rad2deg(alt)))
+    print(u'Brightest star in FOV: {:1.2f} mag'.format(stars_fov.vmag.min()))
 
     if args['--plot']:
-        plot_dark_spot(stars, az, alt, min_altitude)
-
+        plot_dark_spot(stars, az, alt, ra, dec, min_altitude, fact)
 
 
 if __name__ == '__main__':
