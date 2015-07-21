@@ -181,8 +181,8 @@ def dark_spot_gridsearch(observer,
                          az_resolution=4,
                          ):
 
-    azs = np.deg2rad(np.arange(0, 360, az_resolution))
-    alts = np.arange(90, min_altitude, -az_resolution)
+    azs = np.deg2rad(np.arange(0, 360+0.1*az_resolution, az_resolution))
+    alts = np.arange(90, min_altitude, -alt_resolution)
     alts = np.deg2rad(alts)
     light = []
     coords = []
