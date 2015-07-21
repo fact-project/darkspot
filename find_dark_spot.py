@@ -12,6 +12,7 @@ Usage:
 Options:
     --max-zenith=<degrees>    maximal zenith for the dark spot [default: 10]
     --plot                    show the selected position, does not work on gui
+    --show-flux               show the flux as overlay
 '''
 from __future__ import division, print_function
 from docopt import docopt
@@ -196,20 +197,23 @@ def dark_spot_gridsearch(observer,
 
     light = np.array(light)
     coords = np.array(coords)
-    azs = coords[:, 0]
-    alts = coords[:, 1]
+    azs_flat = coords[:, 0]
+    alts_flat = coords[:, 1]
 
     min_index = np.argmin(light)
-    az = azs[min_index]
-    alt = alts[min_index]
+    az = azs_flat[min_index]
+    alt = alts_flat[min_index]
 
     ra, dec = observer.radec_of(az, alt)
+    darkspot = {'ra': ra, 'dec': dec, 'az': az, 'alt': alt}
+    darkspot_data = {'az': azs,  'alt': alts, 'flux': light}
 
-    return az, alt, ra, dec
+    return darkspot, darkspot_data
 
 
-def plot_dark_spot(stars, az, alt, min_altitude):
+def plot_dark_spot(stars, darkspot, darkspot_data, min_altitude):
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
     from cartopy import crs
 
     fig = plt.figure()
@@ -217,7 +221,27 @@ def plot_dark_spot(stars, az, alt, min_altitude):
     ax.background_patch.set_facecolor('black')
 
     ax.set_extent([-180, 180, min_altitude - 5, 90], crs.PlateCarree())
-    ax.plot(np.rad2deg(az), np.rad2deg(alt), 'ro', transform=crs.PlateCarree())
+    ax.plot(
+        np.rad2deg(darkspot['az']),
+        np.rad2deg(darkspot['alt']),
+        'ro',
+        transform=crs.PlateCarree(),
+    )
+
+    if args['--show-flux']:
+        palt, paz  = np.meshgrid(
+            np.rad2deg(darkspot_data['alt']),
+            np.rad2deg(darkspot_data['az']),
+        )
+        plot = plt.pcolormesh(
+            paz,
+            palt,
+            np.reshape(darkspot_data['flux'], (len(darkspot_data['az']), -1)),
+            cmap='gnuplot',
+            norm=LogNorm(),
+            transform=crs.PlateCarree()
+        )
+        fig.colorbar(plot, ax=ax, label='light flux / a.u.')
 
     plot = ax.scatter(
         np.rad2deg(stars.azimuth),
@@ -227,6 +251,7 @@ def plot_dark_spot(stars, az, alt, min_altitude):
         s=0.5*(-stars.vmag + stars.vmag.max())**2,
         transform=crs.PlateCarree(),
         cmap='gray_r',
+        linewidth=0,
     )
 
     ax.text(
@@ -240,24 +265,24 @@ def plot_dark_spot(stars, az, alt, min_altitude):
     )
 
     # draw fov, ugly
-    paz, palt = np.meshgrid(np.linspace(0, 2*pi, 400),
-                            np.linspace(np.deg2rad(min_altitude - 10), pi/2, 200)
-                            )
-    dist = angular_distance(paz, palt, az, alt)
-    ax.contour(np.rad2deg(paz),
-               np.rad2deg(palt),
+    fov_az, fov_alt = np.meshgrid(
+        np.linspace(0, 2*pi, 400),
+        np.linspace(np.deg2rad(min_altitude - 10), pi/2, 200)
+    )
+    dist = angular_distance(fov_az, fov_alt, darkspot['az'], darkspot['alt'])
+    ax.contour(np.rad2deg(fov_az),
+               np.rad2deg(fov_alt),
                dist,
                [np.deg2rad(2.25), ],
                colors='red',
                transform=crs.PlateCarree(),
                )
 
-    paz = np.linspace(0, 360, 100)
+    limit_az = np.linspace(0, 360, 100)
     plt.plot(
-        paz, np.ones_like(paz) * min_altitude,
+        limit_az, np.ones_like(limit_az) * min_altitude,
         'b-', transform=crs.PlateCarree(),
     )
-    fig.colorbar(plot, ax=ax, label='visual magnitude')
 
     fig.tight_layout()
     plt.show()
@@ -281,18 +306,18 @@ def main():
 
     fact = fact_setup(date)
     stars = create_dataframe(fact)
-    az, alt, ra, dec = dark_spot_gridsearch(fact, stars, min_altitude, 0.25, 2)
-    stars_fov = get_stars_in_fov(az, alt, stars, fact)
+    darkspot, data = dark_spot_gridsearch(fact, stars, min_altitude, 0.25, 2)
+    stars_fov = get_stars_in_fov(darkspot['az'], darkspot['alt'], stars, fact)
 
     print(u'best ratescan position:')
-    print(u'RA: {:1.3f} h'.format(np.rad2deg(ra) * 24/360))
-    print(u'DEC: {:1.3f}°'.format(np.rad2deg(dec)))
-    print(u'Az: {:1.3f}°'.format(np.rad2deg(az)))
-    print(u'Alt: {:1.3f}°'.format(np.rad2deg(alt)))
+    print(u'RA: {:2.2f} h'.format(np.rad2deg(darkspot['ra']) * 24/360))
+    print(u'DEC: {:2.2f}°'.format(np.rad2deg(darkspot['dec'])))
+    print(u'Az: {:2.1f}°'.format(np.rad2deg(darkspot['az'])))
+    print(u'Alt: {:2.1f}°'.format(np.rad2deg(darkspot['alt'])))
     print(u'Brightest star in FOV: {:1.2f} mag'.format(stars_fov.vmag.min()))
 
     if args['--plot']:
-        plot_dark_spot(stars, az, alt, min_altitude)
+        plot_dark_spot(stars, darkspot, data, min_altitude)
 
 
 if __name__ == '__main__':
