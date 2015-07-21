@@ -182,7 +182,8 @@ def dark_spot_gridsearch(observer,
                          ):
 
     azs = np.deg2rad(np.arange(0, 360, az_resolution))
-    alts = np.deg2rad(np.arange(min_altitude, 91, 0.5))
+    alts = np.arange(90, min_altitude, -az_resolution)
+    alts = np.deg2rad(alts)
     light = []
     coords = []
 
@@ -239,8 +240,8 @@ def plot_dark_spot(stars, az, alt, min_altitude):
     )
 
     # draw fov, ugly
-    paz, palt = np.meshgrid(np.linspace(0, 2*pi, 200),
-                            np.linspace(pi/2, np.deg2rad(min_altitude - 5), 100)
+    paz, palt = np.meshgrid(np.linspace(0, 2*pi, 400),
+                            np.linspace(np.deg2rad(min_altitude - 10), pi/2, 200)
                             )
     dist = angular_distance(paz, palt, az, alt)
     ax.contour(np.rad2deg(paz),
