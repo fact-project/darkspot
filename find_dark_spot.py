@@ -26,9 +26,9 @@ import numpy as np
 from numpy import sin, cos, tan, arctan2, arcsin, pi, arccos
 import ephem
 from six.moves import input
-from progressbar import ProgressBar
 from datetime import datetime
 from blessings import Terminal
+from tqdm import tqdm
 term = Terminal()
 
 
@@ -189,12 +189,12 @@ def dark_spot_gridsearch(observer,
     light = []
     coords = []
 
-    prog = ProgressBar(maxval=len(azs) * len(alts)).start()
-    for i, az in enumerate(azs):
-        for j, alt in enumerate(alts):
-            coords.append((az, alt))
-            light.append(light_in_fov(az, alt, stars, observer))
-            prog.update(i*len(alts) + j)
+    with tqdm(total=len(azs) * len(alts)) as pbar:
+        for i, az in enumerate(azs):
+            for j, alt in enumerate(alts):
+                coords.append((az, alt))
+                light.append(light_in_fov(az, alt, stars, observer))
+                pbar.update(1)
 
     light = np.array(light)
     coords = np.array(coords)
@@ -213,9 +213,13 @@ def dark_spot_gridsearch(observer,
 
 
 def plot_dark_spot(stars, darkspot, darkspot_data, min_altitude):
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import LogNorm
-    from cartopy import crs
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm
+        from cartopy import crs
+    except ImportError:
+        print('You need matplotlib and cartopy to plot')
+        return
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection=crs.NorthPolarStereo())
@@ -230,7 +234,7 @@ def plot_dark_spot(stars, darkspot, darkspot_data, min_altitude):
     )
 
     if args['--show-flux']:
-        palt, paz  = np.meshgrid(
+        palt, paz = np.meshgrid(
             np.rad2deg(darkspot_data['alt']),
             np.rad2deg(darkspot_data['az']),
         )
@@ -316,6 +320,12 @@ def main():
     print(u'Az: {:2.1f}°'.format(np.rad2deg(darkspot['az'])))
     print(u'Alt: {:2.1f}°'.format(np.rad2deg(darkspot['alt'])))
     print(u'Brightest star in FOV: {:1.2f} mag'.format(stars_fov.vmag.min()))
+
+    print('\nOutput for FACT schedule:')
+    print('"ra":{:.3f}, "dec": {:.3f}'.format(
+        np.rad2deg(darkspot['ra']) * 24/360,
+        np.rad2deg(darkspot['dec']),
+    ))
 
     if args['--plot']:
         plot_dark_spot(stars, darkspot, data, min_altitude)
