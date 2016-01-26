@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 from numpy import sin, cos, tan, arctan2, arcsin, pi, arccos
 import ephem
+from six.moves import input
 from progressbar import ProgressBar
 from datetime import datetime
 from blessings import Terminal
@@ -47,8 +48,8 @@ def enter_datetime():
     ''' a small cli utility to get date and time from the user '''
     print('\nPlease enter date and time for the ratescan')
     print(term.red('This is the real date, be aware for times after 0:00'))
-    date = raw_input('Date (YYYY-MM-DD): ')
-    time = raw_input('Time UTC: (hh:mm): ')
+    date = input('Date (YYYY-MM-DD): ')
+    time = input('Time UTC: (hh:mm): ')
     return date, time
 
 
