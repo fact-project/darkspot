@@ -1,20 +1,37 @@
-# find_dark_spot
-A script that finds the darkest position near zenith for a given time and date. And for fun a Script that plots the whole sky.
+# darkspot
+
+This module provides the script `find_darkspot`,
+which gives you the darkest spot in the sky close
+to zenith for a given date and time.
+
+Darkest spot means area with the size of the FACT FoV
+(4.5 degrees) that has the lowest light flux.
 
 ## installation:
 
-The cartopy builds inside anaconda are currently outdated
-I created an issue for updating it.
-
-In the mean time, install the dependencies like this:
-
-```{shell}
-conda install geos
-conda install -c https://conda.binstar.org/osgeo proj4
+```
+pip install git+https://github.com/fact-project/darkspot 
 ```
 
-And then install cartopy with pip:
-
-```{shell}
+Optionally, for plotting support, also install `cartopy`:
+```
+conda install geos proj4
 pip install cartopy
 ```
+
+## Usage:
+
+Just start the script
+```
+find_darkspot
+```
+and you will be prompted for date and time.
+
+
+## Background:
+
+This module uses the Hipparcos Star catalogue and
+takes all stars into account that are brighter than 
+10 mag.
+
+Planets are added using the `ephem` library.
