@@ -22,5 +22,11 @@ setup(
         'click',
         'astropy>=4',
     ],
+    extras_require={
+        'plot': [
+            'matplotlib',
+            'cartopy',
+        ]
+    },
     zip_safe=False,
 )
