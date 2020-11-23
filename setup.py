@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='darkspot',
-    version='0.2',
+    version='0.3.0',
     description='Find a dark spot in the sky e. g. for a Ratescan',
     url='http://github.com/fact-project/darkspot',
     author='Maximilian Noethe',
@@ -14,14 +14,13 @@ setup(
     entry_points={
         'console_scripts': ['find_darkspot = darkspot.__main__:main']
     },
+    python_requires='>= 3.6',
     install_requires=[
         'numpy',
         'ephem',
-        'pandas',
         'tqdm',
-        'docopt',
-        'blessings',
-        'numexpr',
+        'click',
+        'astropy>=4',
     ],
     zip_safe=False,
 )

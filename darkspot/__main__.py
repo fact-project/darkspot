@@ -1,91 +1,62 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
-'''
-Calculates the darkest spot at <date> for a zenith angle below 10 degrees
-(altitude of 80 degrees).
-Use YYYY-MM-DD hh:mm format for date and time.
-
-
-Usage:
-    find_dark_spot.py [<date> <timeutc>] [options]
-
-Options:
-    --max-zenith=<degrees>    maximal zenith for the dark spot [default: 10]
-    --plot                    show the selected position, does not work on gui
-    --show-flux               show the flux as overlay
-'''
-
-from __future__ import division, print_function
-from docopt import docopt
-from blessings import Terminal
-from datetime import datetime
 import numpy as np
+from astropy.time import Time
+import astropy.units as u
+from astropy.coordinates import EarthLocation
+import click
 
 from . import (
-    fact_setup,
-    create_dataframe,
+    create_catalogue,
     dark_spot_gridsearch,
     get_stars_in_fov,
-    plot_dark_spot
+    plot_dark_spot,
 )
 
-term = Terminal()
 
+@click.command()
+@click.option('-t', '--time', type=Time, help='ISO8601 datestring for the observation time. If not given, now is used.')
+@click.option('--site', help='Site name (must be known to astropy)', default='Roque de los Muchachos')
+@click.option('--lat', type=float, help='Latitude of observatory in decimal degrees, used to override --site')
+@click.option('--lon', type=float, help='Longitude of observatory in decimal degrees, used to override --site')
+@click.option('--min-altitude', type=float, help='Minimum altitude to consider in degrees', default=70)
+@click.option('--fov', type=float, help='Diameter of field of view in degrees', default=4.5)
+@click.option('--plot', type=float, help='Show plot', is_flag=True)
+@click.option('--band', type=click.Choice(['V', 'BT']), default='BT', help='Which optical band to use.')
+def main(time, site, lat, lon, min_altitude, fov, plot, band):
+    min_altitude *= u.deg
+    fov *= u.deg
 
-def enter_datetime():
-    ''' a small cli utility to get date and time from the user '''
-    print('\nPlease enter date and time for the ratescan')
-    print(term.red('This is the real date, be aware for times after 0:00'))
-    date = input('Date (YYYY-MM-DD): ')
-    time = input('Time UTC: (hh:mm): ')
-    return date, time
+    if time is None:
+        time = Time.now()
 
+    if lat is not None and lon is not None:
+        lon *= u.deg
+        lat *= u.deg
+        location = EarthLocation(lon=lon, lat=lat)
+    else:
+        location = EarthLocation.of_site(site)
 
-def main():
-    args = docopt(__doc__)
-    try:
-        min_altitude = 90 - float(args['--max-zenith'])
-        max_zenith = float(args['--max-zenith'])
+    stars = create_catalogue(time, location, min_altitude=min_altitude - fov)
+    darkspot_table = dark_spot_gridsearch(stars, min_altitude=min_altitude, fov=fov, band=band)
 
-        if args['<date>']:
-            date = args['<date>']
-            time = args['<timeutc>']
-        else:
-            date, time = enter_datetime()
+    best = np.argmin(darkspot_table['total_light'])
+    darkspot = darkspot_table[best]
 
-        valid = False
-        while not valid:
-            try:
-                date = datetime.strptime(date + ' ' + time, '%Y-%m-%d %H:%M')
-                valid = True
-            except ValueError:
-                print('Could not parse date/time, please use the given notation\n')
-                date, time = enter_datetime()
+    stars_fov = get_stars_in_fov(darkspot['altaz'], stars)
 
-        fact = fact_setup(date)
-        stars = create_dataframe(fact, min_altitude)
-        darkspot, data = dark_spot_gridsearch(fact, stars, min_altitude, 0.25, 2)
-        stars_fov = get_stars_in_fov(darkspot['az'], darkspot['alt'], stars, fact)
+    print('Darkest position:')
+    print('RA: {:3.2f}°'.format(darkspot['icrs'].ra.deg))
+    print('DEC: {:3.2f}°'.format(darkspot['icrs'].dec.deg))
+    print('Alt: {:3.2f}°'.format(darkspot['altaz'].alt.deg))
+    print('Az: {:3.2f}°'.format(darkspot['altaz'].az.deg))
+    print('Brightest star in FOV: {:1.2f}'.format(stars_fov['BTmag'].min()))
 
-        print(u'best ratescan position:')
-        print(u'RA: {:2.2f} h'.format(np.rad2deg(darkspot['ra']) * 24/360))
-        print(u'DEC: {:2.2f}°'.format(np.rad2deg(darkspot['dec'])))
-        print(u'Az: {:2.1f}°'.format(np.rad2deg(darkspot['az'])))
-        print(u'Alt: {:2.1f}°'.format(np.rad2deg(darkspot['alt'])))
-        print(u'Brightest star in FOV: {:1.2f} mag'.format(stars_fov.vmag.min()))
+    if plot:
+        plot_dark_spot(stars, darkspot, darkspot_table, min_altitude, fov=fov)
 
-        print('\nOutput for FACT schedule:')
-        print('"ra":{:.3f}, "dec": {:.3f}'.format(
-            np.rad2deg(darkspot['ra']) * 24 / 360,
-            np.rad2deg(darkspot['dec']),
-        ))
-
-        if args['--plot']:
-            plot_dark_spot(stars, darkspot, data, min_altitude, args['--show-flux'])
-
-    except (KeyboardInterrupt, SystemExit):
-        pass
+        import matplotlib.pyplot as plt
+        plt.show()
 
 
 if __name__ == '__main__':
-        main()
+    main()
